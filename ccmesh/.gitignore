@@ -1,0 +1,6 @@
+/target
+/Cargo.lock
+.idea
+__pycache__
+*.pdf
+exp
