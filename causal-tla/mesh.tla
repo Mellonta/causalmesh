@@ -6,6 +6,16 @@ MAXVC == 100 \* maximum value of the counter, for testing
 NServer == Cardinality(Servers)
 NClient == Cardinality(Clients)
 NotOverlap(relation) == \A i, j \in DOMAIN relation : i /= j => relation[i] # relation[j]
+
+(* 
+    NeighborCC is map from the server id to its neighbor,
+    it correponds to the propagation chain described in the paper
+    e.g. In the case of 3 servers
+    NeighborCC =
+        S0 -> S1,
+        S1 -> S2,
+        S2 -> S0
+*)
 RECURSIVE Circle(_)
 Circle(s) ==
     IF Cardinality(s) = 1 THEN
@@ -21,6 +31,9 @@ NeighborCC == Circle(Servers)
 
 TypeKey(key) == key \in Keys
 
+(* 
+    Definition of vector clock and happens-before relationship.
+*)
 TypeVC(vc) ==
     /\ vc = [i \in Servers |-> vc[i]]
     /\ \A i \in Servers : vc[i] \in Nat
@@ -36,6 +49,9 @@ VCMerge(vc1, vc2) ==
     [i \in Servers |-> IF vc1[i] > vc2[i] THEN vc1[i] ELSE vc2[i]]
 TestVCs == [Servers -> 1..MAXVC]
 
+(* 
+    Definition of dependencies.
+*)
 EMPTYDEPS == <<>>
 TypeDeps(deps) ==
     deps = EMPTYDEPS
@@ -57,6 +73,10 @@ InsertOrMergeVC(maps, key, vc) ==
         [k \in DOMAIN maps |-> maps[k]] @@
         [k \in {key} |-> vc]
 
+(* 
+    Cache servers stores a hashmap from user keys to Meta.
+    Meta is a tuple of user value, version and dependencies, as defined in Section 4 in the paper.
+*)
 TypeMeta(meta) ==
     /\ meta = [key |-> meta.key, vc |-> meta.vc, deps |-> meta.deps]
     /\ TypeKey(meta.key)
@@ -92,11 +112,18 @@ InsertOrMergeMeta(maps, meta) ==
 AppendMeta(black, meta) ==
     [black EXCEPT ![meta.key] = @ \cup {meta}]
 
+
+(* 
+    White is the Consistent Cache defined in Section 4.
+*)
 TypeWhite(white) ==
     /\ DOMAIN white \subseteq Keys
     /\ \A k \in DOMAIN white : TypeMeta(white[k]) /\ white[k].key = k
 EmptyWhite == [k \in Keys |-> EmptyMeta(k)]
 
+(* 
+    White is the Inconsistent Cache defined in Section 4.
+*)
 TypeBlack(black) ==
     /\ DOMAIN black \subseteq Keys
     /\ \A k \in DOMAIN black : IsFiniteSet(black[k])
@@ -120,6 +147,9 @@ TypeClient(client) ==
     /\ TypeDeps(client.local)
     /\ TypeDeps(client.deps)
 
+(* 
+    TLA+ code for get_deps function in Figure 4.
+*)
 RECURSIVE GetDeps(_, _, _)
 GetDeps(black, deps, todos) ==
     IF deps = EMPTYDEPS THEN todos
@@ -172,7 +202,9 @@ PullTodos(black, white, todos) ==
             LET res == RemoveNotLarger(black[todo], todos[todo], {}, [key |-> todo, vc |-> EmptyVC, deps |-> EMPTYDEPS])
             IN
                 PullTodos([black EXCEPT ![todo] = res[1]], [white EXCEPT ![todo] = MetaMerge(white[todo], res[2])], [k \in DOMAIN todos \ {todo} |-> todos[k]])
-
+(* 
+    TLA+ code for integrate function in Figure 4.
+*)
 PullDeps(black, white, deps) ==
     LET todos == GetDeps(black, deps, {})
     IN
@@ -201,6 +233,9 @@ PullDeps2(black, white, deps) ==
     LET todos == GetDeps2(black, deps, <<>>) IN 
     PullTodos(black, white, todos)
 
+(* 
+    TLA+ code for ClientRead function in Figure 8.
+*)
 Read(black, white, key, deps) ==
     LET res == PullDeps2(black, white, deps)
     IN
@@ -208,11 +243,17 @@ Read(black, white, key, deps) ==
         LET white_res == res[2] IN
         white_res[key]
 
+(* 
+    TLA+ code for ClientWrite function in Figure 8.
+*)
 Write(id, black, white, global_vc, key, deps) ==
     LET new_global_vc == [global_vc EXCEPT ![id] = global_vc[id] + 1] IN 
     LET new_black == [black EXCEPT ![key] = black[key] @@ {[key |-> key, vc |-> new_global_vc, deps |-> deps]}] IN
     new_global_vc
 
+(* 
+    Definition of CausalCut in Section 4 Definition 1.
+*)
 CausalCut(white) ==
     /\  TypeWhite(white)
     /\  \A k \in DOMAIN white:
@@ -223,6 +264,9 @@ CausalCut(white) ==
 
 Neighbor(myid) == NeighborCC[myid]
 
+(* 
+    A message queue between different cache servers.
+*)
 SendToNeighbor(mq, myid, headid, frame) ==
     LET neighbor == Neighbor(myid) IN 
     IF myid = neighbor THEN
@@ -255,7 +299,9 @@ ReadsDepsAreMet(black, white, deps) ==
         \/ VCEqual(deps[k], m.vc)
         \/ VCHappensBefore(deps[k], m.vc)
 
-\* Theorem 2
+(* 
+   UponReadsDepsAreMet is a correction conditon meaning when a client $C$ tries to read from $S_i$, $(S_i \cap C) \cup C.local$ is a cut and it covers $C.local \cup C.deps$.
+*)
 UponReadsDepsAreMet(white, deps) ==
     \A k \in DOMAIN deps:
         \/ VCEqual(deps[k], white[k].vc)
@@ -285,6 +331,7 @@ variables local;
                 with (to_svr_id \in Servers) {
                     with (key \in Keys) {
                         if (optype = "R") {
+                            \* read function in Figure 11
                             if (/\ local /= <<>>
                                 /\ key \in DOMAIN local) {
                                 goto run_client;
@@ -297,6 +344,7 @@ variables local;
                                 svr_mq := SendToServer(svr_mq, to_svr_id, cli_id, cur_frame);
                             };
                         } else {
+                            \* write function in Figure 11
                             cur_frame := [
                                 op |-> "W",
                                 key |-> key,
@@ -619,7 +667,7 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 \* END TRANSLATION 
 Inited == \A s \in Servers: white[s] /= defaultInitValue
 
-\* Lemma 1
+\* BlacksCoverWhites is a correction condition meaning a write $w$ in cache server's C-Cache implies on other servers it's either merged into C-Cache or exists in I-Cache.
 BlacksCoverWhites ==
     Inited => 
         \A si \in Servers:
@@ -628,7 +676,7 @@ BlacksCoverWhites ==
                     LET m == FoldSet(MetaMerge, white[si][k], black[sj][k]) IN
                     \/ VCEqual(white[si][k].vc, m.vc)
                     \/ VCHappensBefore(white[si][k].vc, m.vc)
-\* Lemma 2
+\* PullingEnsureDeps is a correction condition meaning a write $w$ in cache server's C-Cache implies on other servers it's either merged into C-Cache or exists in I-Cache.
 PullingEnsureDeps ==
     Inited =>
         \A s \in Servers:
@@ -640,7 +688,7 @@ PullingEnsureDeps ==
                         \/ VCEqual(white[s][k].deps[kk], m.vc)
                         \/ VCHappensBefore(white[s][k].deps[kk], m.vc)
 
-\* Lemma 3
+\* WhiteIsCausalCut is a correction condition mearning a cache server’s C-cache is always a cut
 WhiteIsCausalCut ==
     Inited =>
         \A s \in Servers: CausalCut(white[s])
