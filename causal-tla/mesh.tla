@@ -300,7 +300,7 @@ ReadsDepsAreMet(black, white, deps) ==
         \/ VCHappensBefore(deps[k], m.vc)
 
 (* 
-   UponReadsDepsAreMet is a correction conditon meaning when a client $C$ tries to read from $S_i$, $(S_i \cap C) \cup C.local$ is a cut and it covers $C.local \cup C.deps$.
+   UponReadsDepsAreMet is a correctness conditon meaning when a client $C$ tries to read from $S_i$, $(S_i \cap C) \cup C.local$ is a cut and it covers $C.local \cup C.deps$.
 *)
 UponReadsDepsAreMet(white, deps) ==
     \A k \in DOMAIN deps:
@@ -667,7 +667,7 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 \* END TRANSLATION 
 Inited == \A s \in Servers: white[s] /= defaultInitValue
 
-\* BlacksCoverWhites is a correction condition meaning a write $w$ in cache server's C-Cache implies on other servers it's either merged into C-Cache or exists in I-Cache.
+\* BlacksCoverWhites is a correctness condition meaning a write $w$ in cache server's C-Cache implies on other servers it's either merged into C-Cache or exists in I-Cache.
 BlacksCoverWhites ==
     Inited => 
         \A si \in Servers:
@@ -676,7 +676,7 @@ BlacksCoverWhites ==
                     LET m == FoldSet(MetaMerge, white[si][k], black[sj][k]) IN
                     \/ VCEqual(white[si][k].vc, m.vc)
                     \/ VCHappensBefore(white[si][k].vc, m.vc)
-\* PullingEnsureDeps is a correction condition meaning a write $w$ in cache server's C-Cache implies on other servers it's either merged into C-Cache or exists in I-Cache.
+\* PullingEnsureDeps is a correctness condition meaning during integration, all dependencies can be found, as described in Section 5.5.
 PullingEnsureDeps ==
     Inited =>
         \A s \in Servers:
@@ -688,7 +688,7 @@ PullingEnsureDeps ==
                         \/ VCEqual(white[s][k].deps[kk], m.vc)
                         \/ VCHappensBefore(white[s][k].deps[kk], m.vc)
 
-\* WhiteIsCausalCut is a correction condition mearning a cache server’s C-cache is always a cut
+\* WhiteIsCausalCut is a correctness condition mearning a cache server’s C-cache is always a cut
 WhiteIsCausalCut ==
     Inited =>
         \A s \in Servers: CausalCut(white[s])
