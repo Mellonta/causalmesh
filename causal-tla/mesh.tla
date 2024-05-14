@@ -33,6 +33,7 @@ TypeKey(key) == key \in Keys
 
 (* 
     Definition of vector clock and happens-before relationship.
+    VCMerge is a function that computes the union of two vector clocks.
 *)
 TypeVC(vc) ==
     /\ vc = [i \in Servers |-> vc[i]]
@@ -51,6 +52,8 @@ TestVCs == [Servers -> 1..MAXVC]
 
 (* 
     Definition of dependencies.
+    DepsMerge is a function that merges two dependencies using the same mechanism as vector
+clocks.
 *)
 EMPTYDEPS == <<>>
 TypeDeps(deps) ==
@@ -122,7 +125,7 @@ TypeWhite(white) ==
 EmptyWhite == [k \in Keys |-> EmptyMeta(k)]
 
 (* 
-    White is the Inconsistent Cache defined in Section 4.
+    Black is the Inconsistent Cache defined in Section 4.
 *)
 TypeBlack(black) ==
     /\ DOMAIN black \subseteq Keys
@@ -266,6 +269,14 @@ Neighbor(myid) == NeighborCC[myid]
 
 (* 
     A message queue between different cache servers.
+    The message between cache servers has the following format:
+    [
+        type |-> "server",
+        headid |-> headid,
+        frame |-> frame
+    ]
+    where headid is the server id of the head of the propagation chain,
+          frame is the content of the message.
 *)
 SendToNeighbor(mq, myid, headid, frame) ==
     LET neighbor == Neighbor(myid) IN 
@@ -278,6 +289,17 @@ SendToNeighbor(mq, myid, headid, frame) ==
             frame |-> frame
         ])]
 
+(* 
+    A message queue between clients/workflows and cache servers.
+    The message has the following format:
+    [
+        type |-> "client",
+        from |-> client_id,
+        frame |-> frame
+    ]
+    where client_id is unique identifier of a client,
+          frame is the content of the message.
+*)
 SendToServer(mq, svr_id, cli_id, frame) ==
     [mq EXCEPT ![svr_id] = Append(mq[svr_id], [
         type |-> "client",
@@ -285,6 +307,14 @@ SendToServer(mq, svr_id, cli_id, frame) ==
         frame |-> frame
     ])]
 
+(* 
+    A message queue between clients/workflows and cache servers.
+    The message has the following format:
+    [
+        frame |-> frame
+    ]
+    This is a response message for a client request.
+*)
 SendToClient(mq, cli_id, frame) ==
     [mq EXCEPT ![cli_id] = Append(mq[cli_id], [
         frame |-> frame
