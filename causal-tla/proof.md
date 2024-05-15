@@ -24,6 +24,7 @@ $$
 \forall w \in S_i.\textit{I-Cache} \cup S_i.\textit{C-Cache}, \forall w' \in w.deps,
 S_i.\textit{C-Cache}[w'.key].vc \ge w'.vc \lor w' \in S_i.\textit{I-Cache}
 $$
+
 Lemma 2 says during integration, all dependencies can be found.
 
 Proof.
