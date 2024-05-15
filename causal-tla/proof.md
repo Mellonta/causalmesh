@@ -1,5 +1,6 @@
 
 Lemma 1:
+
 $$
 \forall (k, v) \in S_i.\textit{C-Cache}, \forall j, \\
 S_j.\textit{C-Cache}[k].vc \ge v.vc \lor v.vc \in S_j.\textit{I-Cache}[k]
@@ -18,6 +19,7 @@ $(k, vc)$ has two sources
       propagated to all cache servers, including $S_1$.
 
 Lemma 2
+
 $$
 \forall w \in S_i.\textit{I-Cache} \cup S_i.\textit{C-Cache}, \forall w' \in w.deps,
 S_i.\textit{C-Cache}[w'.key].vc \ge w'.vc \lor w' \in S_i.\textit{I-Cache}
